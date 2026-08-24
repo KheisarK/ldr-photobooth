@@ -8,7 +8,8 @@ This contract is framework-neutral. Agree on it before the frontend and backend 
 
 - `WAITING_A` — created, but Person A has not submitted all four photos.
 - `WAITING_B` — Person A is finished; Person B may upload.
-- `COMPLETED` — both participants have submitted four photos.
+- `READY_TO_FINALIZE` — both participants are finished; the creator chooses a frame.
+- `COMPLETED` — the photostrip has been finalized.
 
 ## Create a booth
 
@@ -19,7 +20,8 @@ Content-Type: application/json
 
 ```json
 {
-  "name": "Kei"
+  "name": "Kei",
+  "mode": "REFERENCE"
 }
 ```
 
@@ -33,7 +35,7 @@ Content-Type: application/json
 }
 ```
 
-`name` is optional for the MVP. The code is uppercase, case-insensitive when entered, and safe to place in a URL.
+`name` is optional. `mode` accepts `REFERENCE` (default) or `SURPRISE`.
 
 ## Get booth status
 
@@ -83,7 +85,27 @@ Form fields:
 }
 ```
 
-After Person B uploads successfully, the same response has `status: "COMPLETED"` and a non-null `resultUrl`.
+After the guest uploads successfully, the response has `status: "READY_TO_FINALIZE"`.
+
+## Reference photo
+
+```http
+GET /api/booths/{code}/reference/{index}
+```
+
+Returns one creator photo (`index` 1–4) only for a room using Reference Mode.
+
+## Finalize with a frame
+
+```http
+POST /api/booths/{code}/finalize
+X-Booth-Owner-Token: <ownerToken>
+Content-Type: application/json
+
+{"frame":"CLASSIC"}
+```
+
+Frames: `CLASSIC`, `POLAROID`, or `MIDNIGHT`. A successful response changes the room to `COMPLETED` and supplies `resultUrl`.
 
 ## Download the completed photostrip
 
@@ -92,6 +114,15 @@ GET /api/booths/{code}/result
 ```
 
 `200 OK` returns a PNG with a download-friendly `Content-Disposition` header. The image has four rows, with Person A on the left and Person B on the right. Return `409 Conflict` until the booth is complete.
+
+## Delete a booth
+
+```http
+DELETE /api/booths/{code}
+X-Booth-Owner-Token: <ownerToken returned when the booth was created>
+```
+
+Only the creator receives the owner token. A successful request permanently deletes the booth record, its uploaded photos, and its generated photostrip, then returns `204 No Content`.
 
 ## Shared error shape
 
@@ -112,6 +143,6 @@ Minimum cases to handle:
 - `413 Payload Too Large` — photo exceeds the configured limit; and
 - `422 Unprocessable Entity` — wrong photo count, unsupported file type, or invalid field.
 
-## Deferred decision
+## Retention
 
-Automatic booth expiry is intentionally left out of the sprint. Local booth records and images remain until the backend owner removes the runtime data.
+Completed rooms and their files expire 15 minutes after finalization. Abandoned, unfinished rooms expire after 24 hours. The creator may delete a room earlier with the owner token.
