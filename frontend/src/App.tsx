@@ -551,6 +551,7 @@ function App() {
 
   if (roomCode && booth && participant) {
     if (cameraOpen) {
+      const isReferenceCamera = participant === 'b' && booth.mode === 'REFERENCE'
       return (
         <main className="camera-screen">
           <header className="site-header camera-header">
@@ -566,9 +567,13 @@ function App() {
               <p>Posisikan wajah di tengah. Kamera akan menghitung mundur tiga detik.</p>
             </div>
 
-            <div className={`camera-frame camera-frame-${cameraState}`}>
-              {participant === 'b' && booth.mode === 'REFERENCE' && (
-                <img className="reference-photo" src={getReferencePhotoUrl(roomCode, Math.min(capturedPhotos.length + 1, 4))} alt="Referensi pose pasangan" />
+            <div className={`camera-frame camera-frame-${cameraState} ${isReferenceCamera ? 'paired-camera-frame' : ''}`}>
+              {isReferenceCamera && (
+                <>
+                  <img className="reference-photo" src={getReferencePhotoUrl(roomCode, Math.min(capturedPhotos.length + 1, 4))} alt="Foto pasangan di sisi kiri" />
+                  <span className="camera-side-label reference-side-label">pasangan · kiri</span>
+                  <span className="camera-side-label live-side-label">kamu · kanan</span>
+                </>
               )}
               <video ref={videoRef} autoPlay playsInline muted aria-label="Pratinjau kamera" />
               {cameraState === 'requesting' && <div className="camera-overlay"><span className="status-spinner" /><p>Menyiapkan kamera...</p></div>}
