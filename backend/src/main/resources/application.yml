@@ -1,0 +1,23 @@
+server:
+  port: ${PORT:8000}
+
+spring:
+  application:
+    name: ldr-photobooth
+  datasource:
+    url: ${DATABASE_URL:jdbc:h2:file:./data/ldr-photobooth}
+    username: ${DATABASE_USERNAME:sa}
+    password: ${DATABASE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  servlet:
+    multipart:
+      max-file-size: ${MAX_PHOTO_SIZE:10MB}
+      max-request-size: ${MAX_REQUEST_SIZE:40MB}
+
+app:
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+  storage:
+    upload-directory: ${UPLOAD_DIRECTORY:./storage/uploads}
