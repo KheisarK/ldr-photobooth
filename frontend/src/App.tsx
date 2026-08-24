@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { createBooth, getBooth } from './services/api'
 import './App.css'
 
 function App() {
@@ -8,17 +9,41 @@ function App() {
   const [cameraStarted, setCameraStarted] = useState(false)
   const [countdown, setCountdown] = useState<number | null>(null)
   const [snapshot, setSnapshot] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errorMessage, setErrorMessage] = useState('')
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
 
-  const createRoom = () => {
-    setRoomCode(`LDR-${Math.floor(100 + Math.random() * 900)}`)
+  const createRoom = async () => {
+    setIsSubmitting(true)
+    setErrorMessage('')
+    try {
+      const booth = await createBooth()
+      setRoomCode(booth.code)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Gagal membuat room')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  const joinRoom = (event: FormEvent<HTMLFormElement>) => {
+  const joinRoom = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const code = roomInput.trim().toUpperCase()
-    if (code) setRoomCode(code)
+    if (!code) {
+      setErrorMessage('Masukkan kode room terlebih dahulu')
+      return
+    }
+    setIsSubmitting(true)
+    setErrorMessage('')
+    try {
+      const booth = await getBooth(code)
+      setRoomCode(booth.code)
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Room tidak ditemukan')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   useEffect(() => {
@@ -111,7 +136,7 @@ function App() {
           <h1 id="hero-title">Distance,<br /><em>framed.</em></h1>
           <p className="hero-copy">A quiet little photobooth for two people who are not in the same room.</p>
           <div className="hero-actions">
-            <button className="pill-button pill-button-light" type="button" onClick={createRoom}>create a room <span>+</span></button>
+            <button className="pill-button pill-button-light" type="button" onClick={createRoom} disabled={isSubmitting}>{isSubmitting ? 'creating...' : 'create a room'} <span>+</span></button>
             <a className="pill-button pill-button-ghost" href="#join">join with a code <span>-&gt;</span></a>
           </div>
         </div>
@@ -137,7 +162,8 @@ function App() {
           <h2>Enter the<br />room.</h2>
           <form className="join-form" onSubmit={joinRoom}>
             <label htmlFor="room-code">room code</label>
-            <div className="form-row"><input id="room-code" name="room-code" value={roomInput} onChange={(event) => setRoomInput(event.target.value)} placeholder="e.g. LDR-204" /><button className="pill-button pill-button-dark" type="submit">enter room <span>-&gt;</span></button></div>
+            <div className="form-row"><input id="room-code" name="room-code" value={roomInput} onChange={(event) => setRoomInput(event.target.value)} placeholder="e.g. LDR-204" /><button className="pill-button pill-button-dark" type="submit" disabled={isSubmitting}>{isSubmitting ? 'checking...' : 'enter room'} <span>-&gt;</span></button></div>
+            {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}
           </form>
         </div>
         <p className="join-aside">No account.<br />No awkward setup.<br />Just you two.</p>
