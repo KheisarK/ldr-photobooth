@@ -50,7 +50,7 @@ public class BoothService {
 
     @Transactional
     public BoothSummary upload(String code, String participantValue, List<MultipartFile> photos) {
-        Booth booth = findBooth(code);
+        Booth booth = findBoothForUpdate(code);
         Participant participant = parseParticipant(participantValue);
         ensureCorrectTurn(booth, participant);
         storageService.validatePhotos(photos);
@@ -81,7 +81,11 @@ public class BoothService {
     public Path getResult(String code) {
         Booth booth = findBooth(code);
         if (booth.getStatus() != BoothStatus.COMPLETED || booth.getResultPath() == null) {
-            throw new ApiException(HttpStatus.CONFLICT, "RESULT_NOT_READY", "Photostrip is not ready yet.");
+            throw new ApiException(
+                    HttpStatus.CONFLICT,
+                    "RESULT_NOT_READY",
+                    "Photostrip belum siap. Tunggu sampai kedua peserta selesai mengambil foto."
+            );
         }
         return storageService.resolveResult(booth.getResultPath());
     }
@@ -98,7 +102,17 @@ public class BoothService {
                 .orElseThrow(() -> new ApiException(
                         HttpStatus.NOT_FOUND,
                         "BOOTH_NOT_FOUND",
-                        "Booth code was not found."
+                        "Kode booth tidak ditemukan. Periksa kembali kode yang kamu masukkan."
+                ));
+    }
+
+    private Booth findBoothForUpdate(String code) {
+        String normalizedCode = code == null ? "" : code.trim().toUpperCase(Locale.ROOT);
+        return boothRepository.findByCodeIgnoreCaseForUpdate(normalizedCode)
+                .orElseThrow(() -> new ApiException(
+                        HttpStatus.NOT_FOUND,
+                        "BOOTH_NOT_FOUND",
+                        "Kode booth tidak ditemukan. Periksa kembali kode yang kamu masukkan."
                 ));
     }
 
@@ -114,10 +128,15 @@ public class BoothService {
         boolean valid = (participant == Participant.A && booth.getStatus() == BoothStatus.WAITING_A)
                 || (participant == Participant.B && booth.getStatus() == BoothStatus.WAITING_B);
         if (!valid) {
+            String message = switch (booth.getStatus()) {
+                case WAITING_A -> "Peserta B belum bisa mengirim foto sebelum peserta A selesai.";
+                case WAITING_B -> "Foto peserta A sudah terkirim. Sekarang giliran peserta B.";
+                case COMPLETED -> "Sesi foto ini sudah selesai dan tidak menerima foto baru.";
+            };
             throw new ApiException(
                     HttpStatus.CONFLICT,
                     "WRONG_PARTICIPANT_TURN",
-                    "This participant cannot submit photos in the booth's current state."
+                    message
             );
         }
     }
@@ -136,7 +155,7 @@ public class BoothService {
         throw new ApiException(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "CODE_GENERATION_FAILED",
-                "A unique booth code could not be generated."
+                "Kode booth baru gagal dibuat. Silakan coba lagi."
         );
     }
 

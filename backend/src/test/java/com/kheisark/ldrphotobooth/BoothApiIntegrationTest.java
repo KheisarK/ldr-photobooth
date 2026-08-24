@@ -22,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -31,7 +32,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "spring.datasource.url=jdbc:h2:mem:ldr-photobooth-test;DB_CLOSE_DELAY=-1",
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "app.storage.upload-directory=target/test-uploads"
+        "app.storage.upload-directory=target/test-uploads",
+        "app.frontend-url=https://frontend.example",
+        "app.cors.allowed-origins=https://preview.example"
 })
 @AutoConfigureMockMvc
 class BoothApiIntegrationTest {
@@ -75,12 +78,16 @@ class BoothApiIntegrationTest {
         mockMvc.perform(get("/api/booths/{code}/result", code))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.IMAGE_PNG))
-                .andExpect(header().string("Content-Disposition", matchesPattern("attachment;.*\\.png.*")))
+                .andExpect(header().string("Content-Disposition", matchesPattern("inline;.*\\.png.*")))
                 .andExpect(result -> {
                     if (result.getResponse().getContentAsByteArray().length == 0) {
                         throw new AssertionError("Expected a non-empty photostrip.");
                     }
                 });
+
+        mockMvc.perform(get("/api/booths/{code}/result?download=true", code))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition", matchesPattern("attachment;.*\\.png.*")));
     }
 
     @Test
@@ -99,10 +106,65 @@ class BoothApiIntegrationTest {
     }
 
     @Test
+    void rejectsRepeatedUploadAndResultBeforeCompletionInIndonesian() throws Exception {
+        String code = createBooth();
+
+        mockMvc.perform(get("/api/booths/{code}/result", code))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("RESULT_NOT_READY"))
+                .andExpect(jsonPath("$.error.message").value(
+                        "Photostrip belum siap. Tunggu sampai kedua peserta selesai mengambil foto."
+                ));
+
+        mockMvc.perform(photoUpload(code, "a", Color.ORANGE))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(photoUpload(code, "a", Color.ORANGE))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error.code").value("WRONG_PARTICIPANT_TURN"))
+                .andExpect(jsonPath("$.error.message").value(
+                        "Foto peserta A sudah terkirim. Sekarang giliran peserta B."
+                ));
+    }
+
+    @Test
+    void allowsCorsFromProductionLocalhostAndConfiguredPreview() throws Exception {
+        assertCorsAllowed("https://frontend.example");
+        assertCorsAllowed("http://localhost:5173");
+        assertCorsAllowed("http://127.0.0.1:5173");
+        assertCorsAllowed("https://preview.example");
+    }
+
+    @Test
     void returnsNotFoundForUnknownCode() throws Exception {
         mockMvc.perform(get("/api/booths/NOPE99"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error.code").value("BOOTH_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("BOOTH_NOT_FOUND"))
+                .andExpect(jsonPath("$.error.message").value(
+                        "Kode booth tidak ditemukan. Periksa kembali kode yang kamu masukkan."
+                ));
+    }
+
+    @Test
+    void exposesIndonesianApiStatus() throws Exception {
+        mockMvc.perform(get("/api"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("aktif"))
+                .andExpect(jsonPath("$.message").value(
+                        "Backend aktif. Buka aplikasi frontend untuk mulai berfoto."
+                ));
+
+        mockMvc.perform(get("/"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.service").value("LDR Photobooth API"));
+    }
+
+    private void assertCorsAllowed(String origin) throws Exception {
+        mockMvc.perform(options("/api/booths")
+                        .header("Origin", origin)
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", origin));
     }
 
     private String createBooth() throws Exception {

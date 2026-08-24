@@ -1,43 +1,113 @@
-const API_URL = import.meta.env.VITE_API_URL ?? 'https://ldr-photobooth-production-b840.up.railway.app/api'
+const API_URL = (import.meta.env.VITE_API_URL ?? 'https://ldr-photobooth-production-b840.up.railway.app/api').replace(/\/$/, '')
 
-type BoothResponse = {
+export type Participant = 'a' | 'b'
+export type BoothStatus = 'WAITING_A' | 'WAITING_B' | 'COMPLETED'
+
+export type BoothResponse = {
   code: string
-  status: string
+  status: BoothStatus
   shareUrl?: string
+  photoCounts?: {
+    a: number
+    b: number
+  }
+  resultUrl?: string | null
 }
 
-async function parseResponse(response: Response) {
-  if (!response.ok) {
-    throw new Error(`Request gagal (${response.status})`)
+type ApiErrorBody = {
+  error?: {
+    code?: string
+    message?: string
+  }
+}
+
+function defaultErrorMessage(status: number) {
+  if (status === 404) return 'Room tidak ditemukan. Periksa lagi kode yang kamu masukkan.'
+  if (status === 409) return 'Room belum siap untuk langkah ini. Status room akan diperbarui otomatis.'
+  if (status === 413) return 'Ukuran foto terlalu besar. Coba ambil foto ulang.'
+  if (status === 422) return 'Foto tidak dapat diproses. Pastikan jumlahnya tepat 4 foto.'
+  if (status >= 500) return 'Server sedang bermasalah. Coba lagi sebentar.'
+  return 'Permintaan gagal. Silakan coba lagi.'
+}
+
+async function request(input: RequestInfo | URL, init?: RequestInit, timeoutMs = 20_000) {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('Koneksi terlalu lama. Periksa internet kamu lalu coba lagi.')
+    }
+    throw new Error('Tidak dapat terhubung ke server. Periksa koneksi internet kamu.')
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  if (response.ok) return response.json() as Promise<T>
+
+  let body: ApiErrorBody | null = null
+  try {
+    body = await response.json() as ApiErrorBody
+  } catch {
+    // Some proxy errors return HTML instead of the API's normal JSON shape.
   }
 
-  return response.json()
+  const serverMessage = body?.error?.message
+  const safeServerMessage = serverMessage && !/^This participant/i.test(serverMessage)
+    ? serverMessage
+    : null
+  throw new Error(safeServerMessage ?? defaultErrorMessage(response.status))
 }
 
 export async function createBooth(): Promise<BoothResponse> {
-  const response = await fetch(`${API_URL}/booths`, {
+  const response = await request(`${API_URL}/booths`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({}),
   })
 
-  return parseResponse(response)
+  return parseJsonResponse<BoothResponse>(response)
 }
 
 export async function getBooth(code: string): Promise<BoothResponse> {
-  const response = await fetch(`${API_URL}/booths/${encodeURIComponent(code)}`)
-  return parseResponse(response)
+  const response = await request(`${API_URL}/booths/${encodeURIComponent(code)}`)
+  return parseJsonResponse<BoothResponse>(response)
 }
 
-export async function uploadPhotos(code: string, participant: 'a' | 'b', photos: Blob[]) {
+export async function uploadPhotos(code: string, participant: Participant, photos: Blob[]): Promise<BoothResponse> {
+  if (photos.length !== 4) {
+    throw new Error('Kamu harus mengambil tepat 4 foto sebelum mengunggah.')
+  }
+
   const formData = new FormData()
   formData.append('participant', participant)
-  photos.forEach((photo) => formData.append('photos', photo, `photo-${Date.now()}-${Math.random()}.jpg`))
-
-  const response = await fetch(`${API_URL}/booths/${encodeURIComponent(code)}/photos`, {
-    method: 'POST',
-    body: formData,
+  photos.forEach((photo, index) => {
+    formData.append('photos', photo, `${code}-${participant}-${index + 1}.jpg`)
   })
 
-  return parseResponse(response)
+  const response = await request(`${API_URL}/booths/${encodeURIComponent(code)}/photos`, {
+    method: 'POST',
+    body: formData,
+  }, 90_000)
+
+  return parseJsonResponse<BoothResponse>(response)
+}
+
+export function getPhotostripUrl(code: string, resultUrl?: string | null) {
+  if (resultUrl?.startsWith('http://') || resultUrl?.startsWith('https://')) return resultUrl
+
+  const apiOrigin = new URL(API_URL).origin
+  return resultUrl
+    ? new URL(resultUrl, apiOrigin).toString()
+    : `${API_URL}/booths/${encodeURIComponent(code)}/result`
+}
+
+export function getPhotostripDownloadUrl(code: string, resultUrl?: string | null) {
+  const url = new URL(getPhotostripUrl(code, resultUrl))
+  url.searchParams.set('download', 'true')
+  return url.toString()
 }

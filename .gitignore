@@ -45,3 +45,11 @@ coverage/
 *.bak
 *.tmp
 *.temp
+
+# === Local application data ===
+backend/data/
+backend/storage/
+backend/.m2/
+frontend/.npm-cache/
+*.mv.db
+*.trace.db

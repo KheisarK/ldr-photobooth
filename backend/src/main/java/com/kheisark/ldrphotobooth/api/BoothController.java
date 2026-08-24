@@ -36,7 +36,7 @@ public class BoothController {
             @Value("${app.frontend-url}") String frontendUrl
     ) {
         this.boothService = boothService;
-        this.frontendUrl = frontendUrl.replaceAll("/+$", "");
+        this.frontendUrl = frontendUrl.trim().replaceAll("/+$", "");
     }
 
     @PostMapping
@@ -67,9 +67,14 @@ public class BoothController {
     }
 
     @GetMapping(path = "/{code}/result", produces = MediaType.IMAGE_PNG_VALUE)
-    ResponseEntity<Resource> result(@PathVariable String code) {
+    ResponseEntity<Resource> result(
+            @PathVariable String code,
+            @RequestParam(defaultValue = "false") boolean download
+    ) {
         Path result = boothService.getResult(code);
-        ContentDisposition disposition = ContentDisposition.attachment()
+        ContentDisposition disposition = (download
+                ? ContentDisposition.attachment()
+                : ContentDisposition.inline())
                 .filename("ldr-photobooth-" + code.toUpperCase() + ".png")
                 .build();
         return ResponseEntity.ok()
