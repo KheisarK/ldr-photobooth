@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -70,9 +71,19 @@ class BoothApiIntegrationTest {
 
         mockMvc.perform(photoUpload(code, "b", Color.CYAN))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.status").value("READY_TO_FINALIZE"))
                 .andExpect(jsonPath("$.photoCounts.a").value(4))
                 .andExpect(jsonPath("$.photoCounts.b").value(4))
+                .andExpect(jsonPath("$.resultUrl").isEmpty());
+
+        String ownerToken = boothRepository.findByCodeIgnoreCase(code).orElseThrow().getOwnerToken();
+        mockMvc.perform(post("/api/booths/{code}/finalize", code)
+                        .header("X-Booth-Owner-Token", ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"frame\":\"POLAROID\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"))
+                .andExpect(jsonPath("$.frameStyle").value("POLAROID"))
                 .andExpect(jsonPath("$.resultUrl").value("/api/booths/" + code + "/result"));
 
         mockMvc.perform(get("/api/booths/{code}/result", code))
@@ -143,6 +154,33 @@ class BoothApiIntegrationTest {
                 .andExpect(jsonPath("$.error.message").value(
                         "Kode booth tidak ditemukan. Periksa kembali kode yang kamu masukkan."
                 ));
+    }
+
+    @Test
+    void onlyCreatorTokenCanDeleteBooth() throws Exception {
+        String json = mockMvc.perform(post("/api/booths")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ownerToken").isNotEmpty())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        JsonNode response = objectMapper.readTree(json);
+        String code = response.get("code").asText();
+        String ownerToken = response.get("ownerToken").asText();
+
+        mockMvc.perform(delete("/api/booths/{code}", code)
+                        .header("X-Booth-Owner-Token", "wrong-token"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error.code").value("INVALID_OWNER_TOKEN"));
+
+        mockMvc.perform(delete("/api/booths/{code}", code)
+                        .header("X-Booth-Owner-Token", ownerToken))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/booths/{code}", code))
+                .andExpect(status().isNotFound());
     }
 
     @Test
