@@ -2,6 +2,7 @@ package com.kheisark.ldrphotobooth.storage;
 
 import com.kheisark.ldrphotobooth.api.ApiException;
 import com.kheisark.ldrphotobooth.booth.Participant;
+import com.kheisark.ldrphotobooth.booth.FrameStyle;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 
@@ -86,7 +88,7 @@ public class PhotoStorageService {
         }
     }
 
-    public String createPhotostrip(String code, List<String> personAPaths, List<String> personBPaths) {
+    public String createPhotostrip(String code, List<String> personAPaths, List<String> personBPaths, FrameStyle frame) {
         if (personAPaths.size() != 4 || personBPaths.size() != 4) {
             throw storageFailure("Photostrip membutuhkan empat foto dari setiap peserta.", null);
         }
@@ -97,7 +99,12 @@ public class PhotoStorageService {
         Graphics2D graphics = strip.createGraphics();
 
         try {
-            graphics.setColor(Color.WHITE);
+            Color background = switch (frame) {
+                case CLASSIC -> Color.WHITE;
+                case POLAROID -> new Color(250, 243, 226);
+                case MIDNIGHT -> new Color(20, 22, 30);
+            };
+            graphics.setColor(background);
             graphics.fillRect(0, 0, width, height);
             graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
             graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
@@ -131,6 +138,30 @@ public class PhotoStorageService {
             throw new ApiException(HttpStatus.NOT_FOUND, "RESULT_NOT_FOUND", "Berkas photostrip tidak ditemukan.");
         }
         return result;
+    }
+
+    public Path resolvePhoto(String filePath) {
+        Path photo = Path.of(filePath).toAbsolutePath().normalize();
+        ensureInsideRoot(photo);
+        if (!Files.isRegularFile(photo)) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "PHOTO_NOT_FOUND", "Foto referensi tidak ditemukan.");
+        }
+        return photo;
+    }
+
+    public void deleteBoothFiles(String code) {
+        Path boothDirectory = safeBoothDirectory(code);
+        if (!Files.exists(boothDirectory)) {
+            return;
+        }
+
+        try (var paths = Files.walk(boothDirectory)) {
+            for (Path path : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        } catch (IOException exception) {
+            throw storageFailure("Berkas room gagal dihapus. Silakan coba lagi.", exception);
+        }
     }
 
     private BufferedImage readImage(String filePath) {
