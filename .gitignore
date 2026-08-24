@@ -1,0 +1,40 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+vendor/
+target/
+
+# Laravel runtime files
+backend/storage/*.key
+backend/storage/logs/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/bootstrap/cache/*
+
+# Local databases and uploads
+*.sqlite
+*.sqlite3
+backend/storage/app/uploads/*
+!backend/storage/app/uploads/.gitkeep
+
+# IDE and operating system files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+tmp/
