@@ -41,23 +41,23 @@ public class PhotoStorageService {
             throw new ApiException(
                     HttpStatus.UNPROCESSABLE_ENTITY,
                     "INVALID_PHOTO_COUNT",
-                    "Exactly four photos are required."
+                    "Kirim tepat empat foto."
             );
         }
 
         for (MultipartFile photo : photos) {
             if (photo.isEmpty()) {
-                throw invalidPhoto("Photos cannot be empty.");
+                throw invalidPhoto("Foto tidak boleh kosong.");
             }
             if (!ALLOWED_TYPES.contains(photo.getContentType())) {
-                throw invalidPhoto("Only JPEG and PNG photos are supported.");
+                throw invalidPhoto("Foto harus berformat JPEG atau PNG.");
             }
             try (InputStream input = photo.getInputStream()) {
                 if (ImageIO.read(input) == null) {
-                    throw invalidPhoto("A submitted file is not a readable image.");
+                    throw invalidPhoto("Salah satu berkas tidak dapat dibaca sebagai gambar.");
                 }
             } catch (IOException exception) {
-                throw invalidPhoto("A submitted image could not be read.");
+                throw invalidPhoto("Salah satu foto gagal dibaca.");
             }
         }
     }
@@ -82,13 +82,13 @@ public class PhotoStorageService {
             }
             return savedPaths;
         } catch (IOException exception) {
-            throw storageFailure("Photos could not be stored.", exception);
+            throw storageFailure("Foto gagal disimpan. Silakan coba lagi.", exception);
         }
     }
 
     public String createPhotostrip(String code, List<String> personAPaths, List<String> personBPaths) {
         if (personAPaths.size() != 4 || personBPaths.size() != 4) {
-            throw storageFailure("The photostrip needs four photos from each participant.", null);
+            throw storageFailure("Photostrip membutuhkan empat foto dari setiap peserta.", null);
         }
 
         int width = MARGIN * 2 + CELL_WIDTH * 2 + GAP;
@@ -116,11 +116,11 @@ public class PhotoStorageService {
         try {
             Files.createDirectories(result.getParent());
             if (!ImageIO.write(strip, "png", result.toFile())) {
-                throw storageFailure("The photostrip encoder is unavailable.", null);
+                throw storageFailure("Pembuat photostrip sedang tidak tersedia.", null);
             }
             return result.toString();
         } catch (IOException exception) {
-            throw storageFailure("The photostrip could not be written.", exception);
+            throw storageFailure("Photostrip gagal disimpan.", exception);
         }
     }
 
@@ -128,7 +128,7 @@ public class PhotoStorageService {
         Path result = Path.of(resultPath).toAbsolutePath().normalize();
         ensureInsideRoot(result);
         if (!Files.isRegularFile(result)) {
-            throw new ApiException(HttpStatus.NOT_FOUND, "RESULT_NOT_FOUND", "Photostrip file was not found.");
+            throw new ApiException(HttpStatus.NOT_FOUND, "RESULT_NOT_FOUND", "Berkas photostrip tidak ditemukan.");
         }
         return result;
     }
@@ -137,11 +137,11 @@ public class PhotoStorageService {
         try {
             BufferedImage image = ImageIO.read(Path.of(filePath).toFile());
             if (image == null) {
-                throw storageFailure("A stored photo could not be decoded.", null);
+                throw storageFailure("Salah satu foto tersimpan gagal diproses.", null);
             }
             return image;
         } catch (IOException exception) {
-            throw storageFailure("A stored photo could not be read.", exception);
+            throw storageFailure("Salah satu foto tersimpan gagal dibaca.", exception);
         }
     }
 
@@ -169,7 +169,7 @@ public class PhotoStorageService {
 
     private void ensureInsideRoot(Path path) {
         if (!path.toAbsolutePath().normalize().startsWith(uploadRoot)) {
-            throw storageFailure("Invalid storage path.", null);
+            throw storageFailure("Lokasi penyimpanan foto tidak valid.", null);
         }
     }
 
