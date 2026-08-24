@@ -20,7 +20,7 @@ The MVP is asynchronous. Person A and Person B do not need to be online at the s
 ```text
 ldr-photobooth/
 ├── frontend/          # React + Vite client (not scaffolded yet)
-├── backend/           # Laravel or Spring Boot API (decision pending)
+├── backend/           # Spring Boot API
 ├── docs/
 │   ├── API.md         # Draft API contract
 │   └── BRANCHING.md   # Two-person Git workflow
@@ -31,12 +31,8 @@ ldr-photobooth/
 ## Stack decision
 
 - **Frontend:** React + Vite
-- **Backend:** choose exactly one before implementation starts:
-  - **Laravel** — recommended for this three-hour sprint when speed and lower setup friction matter most.
-  - **Spring Boot** — choose when practicing Java is an explicit goal and the backend owner is already comfortable with its setup.
-- **Storage for the sprint:** local file storage and a lightweight database are acceptable. Keep the API contract independent of the framework.
-
-Do not initialize both backend frameworks. Record the final choice in `backend/README.md` before scaffolding it.
+- **Backend:** Spring Boot 3.5 with Java 17 and Maven
+- **Storage for the sprint:** H2 file database plus local image storage
 
 ## Ownership
 
@@ -79,9 +75,7 @@ The sprint is done when:
 ## Getting started
 
 1. Read [`docs/API.md`](docs/API.md) together and settle any contract changes before coding.
-2. Pick Laravel or Spring Boot and update `backend/README.md`.
+2. Follow the backend setup in `backend/README.md`.
 3. Fetch and check out the shared branch for your role as described in [`docs/BRANCHING.md`](docs/BRANCHING.md).
 4. Copy each `.env.example` to `.env` only after the corresponding app has been scaffolded.
-5. Scaffold React/Vite in `frontend/` and the chosen backend in `backend/` on their respective branches.
-
-No install or run commands are included yet because the application frameworks have deliberately not been initialized.
+5. Scaffold React/Vite in `frontend/`; the Spring Boot backend is already initialized in `backend/`.

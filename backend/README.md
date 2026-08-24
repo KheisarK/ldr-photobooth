@@ -1,21 +1,47 @@
 # Backend
 
-This directory is reserved for one backend API. It has deliberately not been scaffolded yet.
+Spring Boot API for the LDR Photobooth MVP.
 
-## Choose before coding
+## Stack
 
-- **Laravel (recommended for the three-hour sprint):** use it when delivery speed is the priority.
-- **Spring Boot:** use it when Java practice is a project goal and setup is already familiar.
+- Java 17
+- Spring Boot 3.5
+- Maven Wrapper
+- Spring Web and Bean Validation
+- Spring Data JPA with an H2 file database
+- Local image storage and Java 2D photostrip composition
 
-Delete this decision section and record the chosen stack here before initialization. Do not install both frameworks.
+## Run locally
 
-The backend owner is responsible for:
+From this directory:
 
-- creating booths and generating unique share codes;
-- accepting exactly four photos per participant;
-- persisting booth state and uploaded images;
-- enforcing `WAITING_A` → `WAITING_B` → `COMPLETED` transitions;
-- validating codes, participant values, indexes, file types, and file sizes; and
-- returning responses that match `../docs/API.md`.
+```bash
+./mvnw spring-boot:run
+```
 
-For the sprint, local storage and SQLite are sufficient. Production hosting and cloud storage are outside the MVP.
+On Windows PowerShell:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+The API starts at `http://localhost:8000/api`. The default configuration works without a `.env` file. Environment variables from `.env.example` can override it; Spring Boot does not load `.env` automatically, so export them in the shell or configure them in the IDE.
+
+## Test
+
+```bash
+./mvnw test
+```
+
+Runtime data is written to `backend/data/` and `backend/storage/uploads/`. Both are ignored by Git.
+
+## API
+
+See [`../docs/API.md`](../docs/API.md). The main flow is:
+
+1. `POST /api/booths`
+2. `POST /api/booths/{code}/photos` with participant `a` and four JPEG/PNG files
+3. `POST /api/booths/{code}/photos` with participant `b` and four JPEG/PNG files
+4. `GET /api/booths/{code}/result`
+
+The completed PNG is a two-column, four-row strip: Person A on the left and Person B on the right.

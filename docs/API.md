@@ -55,7 +55,7 @@ GET /api/booths/{code}
 }
 ```
 
-When `status` is `COMPLETED`, `resultUrl` contains a URL for the combined photostrip. The frontend may poll this endpoint while waiting.
+When `status` is `COMPLETED`, `resultUrl` contains a path on the backend origin for the combined photostrip. The frontend may poll this endpoint while waiting.
 
 ## Upload a participant's photos
 
@@ -67,7 +67,7 @@ Content-Type: multipart/form-data
 Form fields:
 
 - `participant`: `a` or `b`
-- `photos`: exactly four image files, ordered from first to fourth
+- `photos`: exactly four JPEG or PNG files, ordered from first to fourth
 
 `200 OK`
 
@@ -91,7 +91,7 @@ After Person B uploads successfully, the same response has `status: "COMPLETED"`
 GET /api/booths/{code}/result
 ```
 
-`200 OK` returns an image with a download-friendly `Content-Disposition` header. Return `409 Conflict` until the booth is complete.
+`200 OK` returns a PNG with a download-friendly `Content-Disposition` header. The image has four rows, with Person A on the left and Person B on the right. Return `409 Conflict` until the booth is complete.
 
 ## Shared error shape
 
@@ -112,10 +112,6 @@ Minimum cases to handle:
 - `413 Payload Too Large` — photo exceeds the configured limit; and
 - `422 Unprocessable Entity` — wrong photo count, unsupported file type, or invalid field.
 
-## Open decisions for kickoff
+## Deferred decision
 
-- whether the backend composes the final image or the frontend builds it with canvas;
-- accepted photo formats and the maximum dimensions; and
-- whether booth data expires automatically after the demo.
-
-Choose the simplest option both owners can integrate within the sprint.
+Automatic booth expiry is intentionally left out of the sprint. Local booth records and images remain until the backend owner removes the runtime data.

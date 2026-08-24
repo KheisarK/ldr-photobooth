@@ -23,8 +23,10 @@ backend/bootstrap/cache/*
 # Local databases and uploads
 *.sqlite
 *.sqlite3
+backend/data/
 backend/storage/app/uploads/*
 !backend/storage/app/uploads/.gitkeep
+backend/storage/uploads/
 
 # IDE and operating system files
 .idea/
