@@ -28,3 +28,16 @@ export async function getBooth(code: string): Promise<BoothResponse> {
   const response = await fetch(`${API_URL}/booths/${encodeURIComponent(code)}`)
   return parseResponse(response)
 }
+
+export async function uploadPhotos(code: string, participant: 'a' | 'b', photos: Blob[]) {
+  const formData = new FormData()
+  formData.append('participant', participant)
+  photos.forEach((photo) => formData.append('photos', photo, `photo-${Date.now()}-${Math.random()}.jpg`))
+
+  const response = await fetch(`${API_URL}/booths/${encodeURIComponent(code)}/photos`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  return parseResponse(response)
+}

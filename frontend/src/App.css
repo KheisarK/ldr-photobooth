@@ -63,10 +63,17 @@ footer { display: flex; font-size: 11px; justify-content: space-between; letter-
 .camera-heading h1 em { font-weight: 300; }
 .camera-frame { aspect-ratio: 4 / 3; background: #000; overflow: hidden; position: relative; }
 .camera-frame video, .camera-frame img { display: block; height: 100%; object-fit: cover; width: 100%; }
+.photo-grid { display: grid; gap: 2px; grid-template-columns: repeat(2, 1fr); height: 100%; }
+.photo-grid img { min-height: 0; }
+.photo-grid video { grid-column: 1 / -1; min-height: 0; }
 .countdown { align-items: center; background: rgba(0,0,0,.3); display: flex; font-size: 100px; inset: 0; justify-content: center; position: absolute; }
 .camera-controls { align-self: end; grid-column: 2; }
 .camera-controls p { color: #9a9a9a; font-size: 14px; margin-bottom: 22px; }
 .camera-controls .pill-button-light { cursor: pointer; }
+.participant-toggle { align-items: center; display: flex; gap: 8px; margin-bottom: 18px; }
+.participant-toggle span { color: #9a9a9a; font-size: 11px; margin-right: 6px; text-transform: uppercase; }
+.participant-toggle button { background: transparent; border: 1px solid #6d6d6d; color: #fff; cursor: pointer; height: 30px; width: 30px; }
+.participant-toggle button.active { background: #fff; border-color: #fff; color: #000; }
 @media (max-width: 700px) { .site-header { grid-template-columns: 1fr auto; padding: 0 20px; } .header-note { display: none; } .site-header nav { gap: 12px; } .site-header nav a:first-child { display: none; } .hero { min-height: 680px; padding: 110px 20px 80px; } .hero h1 { font-size: clamp(70px, 22vw, 120px); } .scroll-note { left: 20px; } .intro-section, .join-section { display: block; padding: 80px 20px; } .intro-copy { margin-top: 48px; } .steps { margin-top: 64px; } .step { min-height: 210px; } .step + .step { padding-left: 12px; } .join-aside { margin-top: 70px; } .form-row { align-items: flex-start; flex-direction: column; } .camera-content { display: block; padding: 120px 20px 60px; } .camera-heading { margin-bottom: 40px; } .camera-controls { margin-top: 24px; } footer { flex-wrap: wrap; gap: 12px; padding: 20px; } }
 .counter {
   font-size: 16px;

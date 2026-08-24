@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { createBooth, getBooth } from './services/api'
+import { createBooth, getBooth, uploadPhotos } from './services/api'
 import './App.css'
 
 function App() {
@@ -8,7 +8,10 @@ function App() {
   const [roomInput, setRoomInput] = useState('')
   const [cameraStarted, setCameraStarted] = useState(false)
   const [countdown, setCountdown] = useState<number | null>(null)
-  const [snapshot, setSnapshot] = useState<string | null>(null)
+  const [photos, setPhotos] = useState<string[]>([])
+  const [photoBlobs, setPhotoBlobs] = useState<Blob[]>([])
+  const [participant, setParticipant] = useState<'a' | 'b'>('a')
+  const [isUploading, setIsUploading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -72,13 +75,32 @@ function App() {
             canvas.width = video.videoWidth || 640
             canvas.height = video.videoHeight || 480
             canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height)
-            setSnapshot(canvas.toDataURL('image/jpeg'))
+            const image = canvas.toDataURL('image/jpeg', 0.88)
+            canvas.toBlob((blob) => {
+              if (!blob) return
+              setPhotos((current) => [...current, image].slice(0, 4))
+              setPhotoBlobs((current) => [...current, blob].slice(0, 4))
+            }, 'image/jpeg', 0.88)
           }
           return null
         }
         return current - 1
       })
     }, 1000)
+  }
+
+  const uploadCapturedPhotos = async () => {
+    if (photoBlobs.length !== 4) return
+    setIsUploading(true)
+    setErrorMessage('')
+    try {
+      await uploadPhotos(roomCode, participant, photoBlobs)
+      setErrorMessage('')
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Gagal mengupload foto')
+    } finally {
+      setIsUploading(false)
+    }
   }
 
   if (roomCode) {
@@ -89,10 +111,15 @@ function App() {
           <section className="camera-content">
             <div className="camera-heading"><p className="eyebrow">room {roomCode}</p><h1>Look at<br /><em>each other.</em></h1></div>
             <div className="camera-frame">
-              {snapshot ? <img src={snapshot} alt="Your captured photobooth snapshot" /> : <video ref={videoRef} autoPlay playsInline muted />}
+              {photos.length > 0 ? <div className="photo-grid">{photos.map((photo, index) => <img key={`${photo}-${index}`} src={photo} alt={`Captured photo ${index + 1}`} />)}{photos.length < 4 && <video ref={videoRef} autoPlay playsInline muted />}</div> : <video ref={videoRef} autoPlay playsInline muted />}
               {countdown !== null && <div className="countdown">{countdown}</div>}
             </div>
-            <div className="camera-controls"><p>{snapshot ? 'Your moment is ready.' : 'When you are both ready, capture together.'}</p><button className="pill-button pill-button-light" type="button" onClick={snapshot ? () => setSnapshot(null) : capturePhoto}>{snapshot ? 'retake photo' : 'capture photo'} <span>{snapshot ? '↺' : '+'}</span></button></div>
+            <div className="camera-controls">
+              <div className="participant-toggle"><span>your side</span><button className={participant === 'a' ? 'active' : ''} type="button" onClick={() => setParticipant('a')}>A</button><button className={participant === 'b' ? 'active' : ''} type="button" onClick={() => setParticipant('b')}>B</button></div>
+              <p>{photos.length}/4 photos captured. {photos.length < 4 ? 'Capture four moments for your strip.' : 'Ready to send your photos.'}</p>
+              {photos.length < 4 ? <button className="pill-button pill-button-light" type="button" onClick={capturePhoto} disabled={countdown !== null}>{countdown !== null ? 'get ready...' : 'capture photo'} <span>+</span></button> : <button className="pill-button pill-button-light" type="button" onClick={uploadCapturedPhotos} disabled={isUploading}>{isUploading ? 'uploading...' : `upload 4 photos`} <span>-&gt;</span></button>}
+              {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}
+            </div>
           </section>
         </main>
       )
