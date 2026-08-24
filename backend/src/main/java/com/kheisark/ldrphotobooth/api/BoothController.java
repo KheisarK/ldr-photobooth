@@ -25,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/booths")
@@ -73,7 +74,9 @@ public class BoothController {
     @GetMapping("/{code}/reference/{index}")
     ResponseEntity<Resource> reference(@PathVariable String code, @PathVariable int index) {
         Path photo = boothService.getReferencePhoto(code, index);
-        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(new FileSystemResource(photo));
+        String filename = photo.getFileName().toString().toLowerCase(Locale.ROOT);
+        MediaType contentType = filename.endsWith(".png") ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG;
+        return ResponseEntity.ok().contentType(contentType).body(new FileSystemResource(photo));
     }
 
     @DeleteMapping("/{code}")
