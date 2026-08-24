@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { FormEvent, SyntheticEvent } from 'react'
+import type { FormEvent, MouseEvent as ReactMouseEvent, SyntheticEvent } from 'react'
 import {
   createBooth,
   deleteBooth,
@@ -103,6 +103,7 @@ function App() {
   const streamRef = useRef<MediaStream | null>(null)
   const captureRunRef = useRef(0)
   const capturedPhotosRef = useRef<CapturedPhoto[]>([])
+  const joinDialogRef = useRef<HTMLDialogElement>(null)
 
   const rememberRole = (code: string, role: Participant) => {
     try {
@@ -365,6 +366,7 @@ function App() {
     setActionMessage('')
     try {
       const summary = await getBooth(code)
+      joinDialogRef.current?.close()
       setActiveBooth(summary, 'b')
     } catch (error) {
       setHomeErrorLocation('join')
@@ -521,6 +523,35 @@ function App() {
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     event.currentTarget.hidden = true
     setErrorMessage('Photostrip belum dapat dimuat. Coba muat ulang halaman beberapa saat lagi.')
+  }
+
+  const openJoinDialog = () => {
+    setHomeErrorLocation('join')
+    setErrorMessage('')
+    const dialog = joinDialogRef.current
+    if (!dialog || dialog.open) return
+    dialog.showModal()
+    window.setTimeout(() => document.getElementById('room-code')?.focus(), 50)
+  }
+
+  const closeJoinDialog = () => {
+    joinDialogRef.current?.close()
+    setErrorMessage('')
+  }
+
+  const resetHomeAndScroll = () => {
+    resetToHome()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleJoinDialogBackdropClick = (event: ReactMouseEvent<HTMLDialogElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect()
+    const clickedOutside = event.clientX < bounds.left
+      || event.clientX > bounds.right
+      || event.clientY < bounds.top
+      || event.clientY > bounds.bottom
+
+    if (clickedOutside) closeJoinDialog()
   }
 
   const handleFinalize = async () => {
@@ -757,81 +788,131 @@ function App() {
   }
 
   return (
-    <main>
-      <header className="site-header">
-        <button className="wordmark link-button" type="button" onClick={() => resetToHome()}>ldr / photobooth</button>
-        <span className="header-note">bareng, walau berjauhan</span>
+    <main className="home-page">
+      <header className="site-header home-header">
+        <button className="wordmark link-button" type="button" onClick={resetHomeAndScroll}>ldr / photobooth</button>
+        <span className="header-note">dua tempat · satu cerita</span>
         <nav aria-label="Navigasi utama">
           <a href="#cara-main">cara main</a>
-          <a href="#gabung">gabung room</a>
+          <button type="button" onClick={openJoinDialog}>gabung room</button>
         </nav>
       </header>
 
-      <section className="hero" aria-labelledby="hero-title">
-        <div className="hero-wash" aria-hidden="true" />
-        <div className="hero-content">
-          <p className="eyebrow">satu momen dari dua tempat</p>
-          <h1 id="hero-title">Jauh,<br /><em>tetap dekat.</em></h1>
-          <p className="hero-copy">Photobooth kecil untuk kamu dan orang tersayang yang lagi nggak ada di tempat yang sama.</p>
-          <div className="hero-actions">
-            <button className="pill-button pill-button-light" type="button" onClick={createRoom} disabled={isSubmitting}>
-              {isSubmitting ? 'membuat room...' : 'buat room baru'} <span>+</span>
-            </button>
-            <a className="pill-button pill-button-ghost" href="#gabung">masuk pakai kode <span>→</span></a>
-          </div>
-          <div className="mode-picker" aria-label="Pilih mode room">
-            <button type="button" className={selectedMode === 'REFERENCE' ? 'selected' : ''} onClick={() => setSelectedMode('REFERENCE')}><strong>Reference Mode</strong><span>Tamu melihat foto pembuat agar pose bisa nyambung.</span></button>
-            <button type="button" className={selectedMode === 'SURPRISE' ? 'selected' : ''} onClick={() => setSelectedMode('SURPRISE')}><strong>Surprise Mode</strong><span>Foto baru terlihat bersama saat reveal.</span></button>
-          </div>
-          {errorMessage && homeErrorLocation === 'hero' && <p className="hero-error form-error" role="alert">{errorMessage}</p>}
-        </div>
-        <p className="scroll-note">geser untuk mulai / 01</p>
-      </section>
+      <section className="home-hero" aria-labelledby="hero-title">
+        <div className="home-glow home-glow-one" aria-hidden="true" />
+        <div className="home-glow home-glow-two" aria-hidden="true" />
+        <div className="home-hero-inner">
+          <div className="home-hero-copy">
+            <p className="eyebrow">photobooth berdua dari tempat berbeda</p>
+            <h1 id="hero-title">Dua tempat.<br /><em>Satu photostrip.</em></h1>
+            <p className="hero-copy">Ambil foto bergantian, saling balas pose, lalu satukan delapan momen kalian dalam satu strip yang bisa disimpan.</p>
 
-      <section className="intro-section" id="cara-main">
-        <div className="section-label">01 / cara main</div>
-        <div className="intro-copy">
-          <h2>Bikin kenangan<br /><span>tanpa harus ketemu.</span></h2>
-          <p>Nggak perlu akun dan nggak perlu foto bersamaan. Cukup kamera, link room, dan satu orang yang kamu tunggu.</p>
-        </div>
-        <div className="steps" aria-label="Langkah menggunakan photobooth">
-          <div className="step"><span>01</span><strong>Buat room</strong><p>Pembuat memilih mode dan mendapat kode privat.</p></div>
-          <div className="step"><span>02</span><strong>Ambil 4 foto</strong><p>Pembuat berfoto dulu, lalu mengirim link undangan.</p></div>
-          <div className="step"><span>03</span><strong>Lanjut bergantian</strong><p>Tamu membuka link dan mengambil 4 foto juga.</p></div>
-          <div className="step"><span>04</span><strong>Pilih frame</strong><p>Reveal, pilih frame, lalu unduh photostrip.</p></div>
-        </div>
-      </section>
+            <fieldset className="home-mode-picker">
+              <legend>Pilih suasana sesi</legend>
+              <div className="mode-segments">
+                <label className={selectedMode === 'REFERENCE' ? 'selected' : ''}>
+                  <input type="radio" name="booth-mode" value="REFERENCE" checked={selectedMode === 'REFERENCE'} onChange={() => setSelectedMode('REFERENCE')} />
+                  <span>Reference</span><small>pose nyambung</small>
+                </label>
+                <label className={selectedMode === 'SURPRISE' ? 'selected' : ''}>
+                  <input type="radio" name="booth-mode" value="SURPRISE" checked={selectedMode === 'SURPRISE'} onChange={() => setSelectedMode('SURPRISE')} />
+                  <span>Surprise</span><small>reveal bareng</small>
+                </label>
+              </div>
+              <p aria-live="polite">{selectedMode === 'REFERENCE'
+                ? 'Pasangan melihat fotomu sebagai referensi agar pose kalian terasa saling merespons.'
+                : 'Foto pasangan disembunyikan selama sesi dan baru terlihat bersama saat reveal.'}</p>
+            </fieldset>
 
-      <section className="join-section" id="gabung">
-        <div className="join-panel">
-          <p className="eyebrow">sudah dapat undangan?</p>
-          <h2>Masuk ke<br />room.</h2>
-          <form className="join-form" onSubmit={joinRoom}>
-            <label htmlFor="room-code">kode room</label>
-            <div className="form-row">
-              <input
-                id="room-code"
-                name="room-code"
-                value={roomInput}
-                onChange={(event) => setRoomInput(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
-                placeholder="contoh: K7F2AD"
-                maxLength={6}
-                autoComplete="off"
-                spellCheck={false}
-                aria-describedby="join-hint"
-              />
-              <button className="pill-button pill-button-dark" type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'mengecek...' : 'masuk room'} <span>→</span>
+            <div className="home-hero-actions">
+              <button className="home-primary-action" type="button" onClick={createRoom} disabled={isSubmitting}>
+                <span>{isSubmitting ? 'membuat room...' : 'buat room baru'}</span><b aria-hidden="true">↗</b>
+              </button>
+              <button className="home-secondary-action" type="button" onClick={openJoinDialog}>
+                sudah punya kode? <span>gabung room</span>
               </button>
             </div>
-            <p id="join-hint" className="form-hint">Kamu akan masuk sebagai tamu di room ini.</p>
-            {errorMessage && homeErrorLocation === 'join' && <p className="form-error" role="alert">{errorMessage}</p>}
-          </form>
+            {errorMessage && homeErrorLocation === 'hero' && <p className="hero-error form-error" role="alert">{errorMessage}</p>}
+          </div>
+
+          <figure className={`product-preview ${selectedMode === 'SURPRISE' ? 'is-surprise' : ''}`} role="img" aria-label={`Contoh photostrip dalam ${selectedMode === 'REFERENCE' ? 'Reference' : 'Surprise'} Mode`}>
+            <div className="preview-note preview-note-a">A · kiri</div>
+            <div className="preview-note preview-note-b">B · kanan</div>
+            <div className="sample-tape" aria-hidden="true" />
+            <div className="sample-strip">
+              <div className="sample-strip-head"><span>ldr / booth</span><span>08·25·26</span></div>
+              {[0, 1, 2, 3].map((index) => (
+                <div className="sample-row" key={index}>
+                  <div className={`sample-photo sample-person-a sample-palette-${index}`}><span className="portrait-head" /><span className="portrait-body" /></div>
+                  <div className={`sample-photo sample-person-b sample-palette-${index}`}><span className="portrait-head" /><span className="portrait-body" /><span className="surprise-cover"><b>?</b><small>lihat saat reveal</small></span></div>
+                </div>
+              ))}
+              <div className="sample-caption">jauh di peta, dekat di frame ♡</div>
+            </div>
+            <div className="preview-badge"><strong>4 + 4</strong><span>foto jadi satu</span></div>
+          </figure>
         </div>
-        <p className="join-aside">Tanpa akun.<br />Tanpa ribet.<br />Cuma kalian berdua.</p>
       </section>
 
-      <footer><span>ldr / photobooth</span><span>dibuat untuk yang sedang berjauhan</span><span>2026</span></footer>
+      <div className="home-trust-row" aria-label="Informasi singkat">
+        <span>tanpa akun</span><span>4 foto per orang</span><span>room privat</span><span>hapus otomatis</span>
+      </div>
+
+      <section className="how-section" id="cara-main" aria-labelledby="how-title">
+        <div className="how-heading">
+          <p className="section-label">cara main / tiga langkah</p>
+          <h2 id="how-title">Nggak harus satu tempat<br /><em>untuk punya satu momen.</em></h2>
+        </div>
+        <ol className="how-steps">
+          <li><span>01</span><div><strong>Buat & bagikan</strong><p>Pilih mode, buat room privat, lalu kirim link ke pasanganmu.</p></div></li>
+          <li><span>02</span><div><strong>Foto bergantian</strong><p>Kalian mengambil empat foto masing-masing, dari kamera dan tempat sendiri.</p></div></li>
+          <li><span>03</span><div><strong>Reveal & simpan</strong><p>Pilih frame setelah reveal, lalu unduh photostrip sebelum room terhapus otomatis.</p></div></li>
+        </ol>
+        <div className="mode-explainer">
+          <article><span aria-hidden="true">◎</span><div><strong>Reference Mode</strong><p>Lihat pose pasangan saat giliranmu supaya gestur dan ceritanya bisa nyambung.</p></div></article>
+          <article><span aria-hidden="true">◐</span><div><strong>Surprise Mode</strong><p>Berfoto tanpa mengintip, lalu lihat semua respons kalian saat reveal.</p></div></article>
+        </div>
+      </section>
+
+      <section className="home-closing" aria-label="Tentang privasi room">
+        <p className="eyebrow">kecil, privat, cuma untuk kalian</p>
+        <p>Room selesai tersimpan selama 15 menit—cukup untuk download, lalu semua foto dibersihkan otomatis.</p>
+        <span aria-hidden="true">♡</span>
+      </section>
+
+      <dialog
+        className="join-dialog"
+        id="gabung"
+        ref={joinDialogRef}
+        aria-labelledby="join-title"
+        onClick={handleJoinDialogBackdropClick}
+      >
+        <button className="dialog-close" type="button" onClick={closeJoinDialog} aria-label="Tutup form gabung">×</button>
+        <p className="eyebrow">sudah dapat undangan?</p>
+        <h2 id="join-title">Masuk ke<br /><em>room kalian.</em></h2>
+        <form className="join-form" onSubmit={joinRoom} aria-busy={isSubmitting}>
+          <label htmlFor="room-code">kode room</label>
+          <div className="dialog-form-row">
+            <input
+              id="room-code"
+              name="room-code"
+              value={roomInput}
+              onChange={(event) => setRoomInput(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))}
+              placeholder="K7F2AD"
+              maxLength={6}
+              autoComplete="off"
+              spellCheck={false}
+              aria-describedby={`join-hint${errorMessage && homeErrorLocation === 'join' ? ' join-error' : ''}`}
+              aria-invalid={Boolean(errorMessage && homeErrorLocation === 'join')}
+            />
+            <button type="submit" disabled={isSubmitting}>{isSubmitting ? 'mengecek...' : 'masuk'} <span aria-hidden="true">→</span></button>
+          </div>
+          <p id="join-hint" className="form-hint">Enam karakter dari pembuat room. Kamu akan masuk sebagai tamu.</p>
+          {errorMessage && homeErrorLocation === 'join' && <p id="join-error" className="form-error" role="alert">{errorMessage}</p>}
+        </form>
+      </dialog>
+
+      <footer className="home-footer"><span>ldr / photobooth</span><span>dibuat untuk yang sedang berjauhan</span><span>2026</span></footer>
     </main>
   )
 }
