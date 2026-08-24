@@ -4,10 +4,13 @@ import com.kheisark.ldrphotobooth.api.ApiException;
 import com.kheisark.ldrphotobooth.storage.PhotoStorageService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.file.Path;
+import java.time.Duration;
+import java.time.Instant;
 import java.security.SecureRandom;
 import java.util.List;
 import java.util.Locale;
@@ -35,11 +38,15 @@ public class BoothService {
     }
 
     @Transactional
-    public Booth create(String participantAName) {
+    public Booth create(String participantAName, String modeValue) {
         String normalizedName = participantAName == null || participantAName.isBlank()
                 ? null
                 : participantAName.trim();
-        return boothRepository.save(new Booth(generateUniqueCode(), normalizedName));
+        try {
+            return boothRepository.save(new Booth(generateUniqueCode(), normalizedName, BoothMode.from(modeValue)));
+        } catch (IllegalArgumentException exception) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_MODE", exception.getMessage());
+        }
     }
 
     @Transactional(readOnly = true)
@@ -64,13 +71,7 @@ public class BoothService {
         if (participant == Participant.A) {
             booth.finishParticipantA();
         } else {
-            List<String> personAPaths = photoRepository
-                    .findAllByBoothAndParticipantOrderByPhotoIndexAsc(booth, Participant.A)
-                    .stream()
-                    .map(BoothPhoto::getFilePath)
-                    .toList();
-            String resultPath = storageService.createPhotostrip(booth.getCode(), personAPaths, savedPaths);
-            booth.complete(resultPath);
+            booth.finishParticipantB();
         }
 
         boothRepository.save(booth);
@@ -90,10 +91,87 @@ public class BoothService {
         return storageService.resolveResult(booth.getResultPath());
     }
 
+    @Transactional(readOnly = true)
+    public Path getReferencePhoto(String code, int index) {
+        Booth booth = findBooth(code);
+        if (booth.getMode() != BoothMode.REFERENCE) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "REFERENCE_DISABLED", "Room ini memakai Surprise Mode.");
+        }
+        if (index < 1 || index > 4 || booth.getStatus() == BoothStatus.WAITING_A) {
+            throw new ApiException(HttpStatus.NOT_FOUND, "REFERENCE_NOT_READY", "Foto referensi belum tersedia.");
+        }
+        List<BoothPhoto> photos = photoRepository.findAllByBoothAndParticipantOrderByPhotoIndexAsc(booth, Participant.A);
+        if (photos.size() < index) throw new ApiException(HttpStatus.NOT_FOUND, "REFERENCE_NOT_READY", "Foto referensi belum tersedia.");
+        return storageService.resolvePhoto(photos.get(index - 1).getFilePath());
+    }
+
+    @Transactional
+    public BoothSummary finalizeBooth(String code, String ownerToken, String frameValue) {
+        Booth booth = findBoothForUpdate(code);
+        verifyOwner(booth, ownerToken);
+        if (booth.getStatus() != BoothStatus.READY_TO_FINALIZE) {
+            throw new ApiException(HttpStatus.CONFLICT, "PHOTOS_NOT_READY", "Tunggu sampai kedua orang selesai mengambil foto.");
+        }
+        FrameStyle frame;
+        try {
+            frame = FrameStyle.from(frameValue);
+        } catch (IllegalArgumentException exception) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_FRAME", exception.getMessage());
+        }
+        List<String> a = pathsFor(booth, Participant.A);
+        List<String> b = pathsFor(booth, Participant.B);
+        String resultPath = storageService.createPhotostrip(booth.getCode(), a, b, frame);
+        booth.complete(resultPath, frame);
+        boothRepository.save(booth);
+        return summarize(booth);
+    }
+
+    @Transactional
+    public void delete(String code, String ownerToken) {
+        Booth booth = findBoothForUpdate(code);
+        verifyOwner(booth, ownerToken);
+
+        storageService.deleteBoothFiles(booth.getCode());
+        photoRepository.deleteAllByBooth(booth);
+        boothRepository.delete(booth);
+    }
+
     private BoothSummary summarize(Booth booth) {
         long personACount = photoRepository.countByBoothAndParticipant(booth, Participant.A);
         long personBCount = photoRepository.countByBoothAndParticipant(booth, Participant.B);
-        return new BoothSummary(booth.getCode(), booth.getStatus(), personACount, personBCount);
+        Instant expiresAt = booth.getStatus() == BoothStatus.COMPLETED
+                ? (booth.getCompletedAt() == null ? booth.getCreatedAt() : booth.getCompletedAt()).plus(Duration.ofMinutes(15))
+                : booth.getCreatedAt().plus(Duration.ofHours(24));
+        return new BoothSummary(booth.getCode(), booth.getStatus(), booth.getMode(), booth.getFrameStyle(), personACount, personBCount, expiresAt);
+    }
+
+    @Scheduled(fixedDelay = 60_000)
+    @Transactional
+    public void cleanupExpiredRooms() {
+        Instant now = Instant.now();
+        for (Booth booth : boothRepository.findAll()) {
+            Instant expiry = booth.getStatus() == BoothStatus.COMPLETED
+                    ? (booth.getCompletedAt() == null ? booth.getCreatedAt() : booth.getCompletedAt()).plus(Duration.ofMinutes(15))
+                    : booth.getCreatedAt().plus(Duration.ofHours(24));
+            if (expiry.isBefore(now)) deleteInternal(booth);
+        }
+    }
+
+    private List<String> pathsFor(Booth booth, Participant participant) {
+        return photoRepository.findAllByBoothAndParticipantOrderByPhotoIndexAsc(booth, participant)
+                .stream().map(BoothPhoto::getFilePath).toList();
+    }
+
+    private void verifyOwner(Booth booth, String ownerToken) {
+        if (ownerToken == null || booth.getOwnerToken() == null || !booth.getOwnerToken().equals(ownerToken.trim())) {
+            throw new ApiException(HttpStatus.FORBIDDEN, "INVALID_OWNER_TOKEN", "Room hanya dapat dikelola dari perangkat yang membuatnya.");
+        }
+    }
+
+    private void deleteInternal(Booth booth) {
+        storageService.deleteBoothFiles(booth.getCode());
+        photoRepository.deleteAllByBooth(booth);
+        boothRepository.delete(booth);
     }
 
     private Booth findBooth(String code) {
@@ -131,7 +209,7 @@ public class BoothService {
             String message = switch (booth.getStatus()) {
                 case WAITING_A -> "Peserta B belum bisa mengirim foto sebelum peserta A selesai.";
                 case WAITING_B -> "Foto peserta A sudah terkirim. Sekarang giliran peserta B.";
-                case COMPLETED -> "Sesi foto ini sudah selesai dan tidak menerima foto baru.";
+                case READY_TO_FINALIZE, COMPLETED -> "Sesi foto ini sudah selesai dan tidak menerima foto baru.";
             };
             throw new ApiException(
                     HttpStatus.CONFLICT,
@@ -159,6 +237,6 @@ public class BoothService {
         );
     }
 
-    public record BoothSummary(String code, BoothStatus status, long personACount, long personBCount) {
+    public record BoothSummary(String code, BoothStatus status, BoothMode mode, FrameStyle frameStyle, long personACount, long personBCount, Instant expiresAt) {
     }
 }
