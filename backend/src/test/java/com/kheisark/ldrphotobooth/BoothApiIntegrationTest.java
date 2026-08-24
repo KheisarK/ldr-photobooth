@@ -69,6 +69,10 @@ class BoothApiIntegrationTest {
                 .andExpect(jsonPath("$.photoCounts.b").value(0))
                 .andExpect(jsonPath("$.resultUrl").isEmpty());
 
+        mockMvc.perform(get("/api/booths/{code}/reference/{index}", code, 1))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.IMAGE_PNG));
+
         mockMvc.perform(photoUpload(code, "b", Color.CYAN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("READY_TO_FINALIZE"))
