@@ -1,17 +1,23 @@
 const API_URL = (import.meta.env.VITE_API_URL ?? 'https://ldr-photobooth-production-b840.up.railway.app/api').replace(/\/$/, '')
 
 export type Participant = 'a' | 'b'
-export type BoothStatus = 'WAITING_A' | 'WAITING_B' | 'COMPLETED'
+export type BoothStatus = 'WAITING_A' | 'WAITING_B' | 'READY_TO_FINALIZE' | 'COMPLETED'
+export type BoothMode = 'REFERENCE' | 'SURPRISE'
+export type FrameStyle = 'CLASSIC' | 'POLAROID' | 'MIDNIGHT'
 
 export type BoothResponse = {
   code: string
   status: BoothStatus
+  mode: BoothMode
+  frameStyle?: FrameStyle | null
+  expiresAt?: string
   shareUrl?: string
   photoCounts?: {
     a: number
     b: number
   }
   resultUrl?: string | null
+  ownerToken?: string
 }
 
 type ApiErrorBody = {
@@ -63,11 +69,11 @@ async function parseJsonResponse<T>(response: Response): Promise<T> {
   throw new Error(safeServerMessage ?? defaultErrorMessage(response.status))
 }
 
-export async function createBooth(): Promise<BoothResponse> {
+export async function createBooth(mode: BoothMode): Promise<BoothResponse> {
   const response = await request(`${API_URL}/booths`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ mode }),
   })
 
   return parseJsonResponse<BoothResponse>(response)
@@ -76,6 +82,28 @@ export async function createBooth(): Promise<BoothResponse> {
 export async function getBooth(code: string): Promise<BoothResponse> {
   const response = await request(`${API_URL}/booths/${encodeURIComponent(code)}`)
   return parseJsonResponse<BoothResponse>(response)
+}
+
+export async function finalizeBooth(code: string, ownerToken: string, frame: FrameStyle): Promise<BoothResponse> {
+  const response = await request(`${API_URL}/booths/${encodeURIComponent(code)}/finalize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Booth-Owner-Token': ownerToken },
+    body: JSON.stringify({ frame }),
+  }, 90_000)
+  return parseJsonResponse<BoothResponse>(response)
+}
+
+export function getReferencePhotoUrl(code: string, index: number) {
+  return `${API_URL}/booths/${encodeURIComponent(code)}/reference/${index}`
+}
+
+export async function deleteBooth(code: string, ownerToken: string): Promise<void> {
+  const response = await request(`${API_URL}/booths/${encodeURIComponent(code)}`, {
+    method: 'DELETE',
+    headers: { 'X-Booth-Owner-Token': ownerToken },
+  })
+
+  if (!response.ok) await parseJsonResponse<never>(response)
 }
 
 export async function uploadPhotos(code: string, participant: Participant, photos: Blob[]): Promise<BoothResponse> {
