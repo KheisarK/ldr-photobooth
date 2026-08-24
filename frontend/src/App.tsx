@@ -14,6 +14,7 @@ const PHOTO_TOTAL = 4
 const POLL_INTERVAL_MS = 3_000
 
 type CameraState = 'idle' | 'requesting' | 'ready' | 'error'
+type HomeErrorLocation = 'hero' | 'join' | null
 
 type CapturedPhoto = {
   blob: Blob
@@ -77,6 +78,7 @@ function App() {
   const [pollMessage, setPollMessage] = useState('')
   const [actionMessage, setActionMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [homeErrorLocation, setHomeErrorLocation] = useState<HomeErrorLocation>(null)
   const [copiedValue, setCopiedValue] = useState<'code' | 'link' | null>(null)
 
   const [cameraOpen, setCameraOpen] = useState(false)
@@ -116,6 +118,7 @@ function App() {
     setParticipant(role)
     setRoomInput('')
     setErrorMessage('')
+    setHomeErrorLocation(null)
     setPollMessage('')
     rememberRole(code, role)
     if (updateUrl) window.history.pushState({}, '', `/booths/${code}`)
@@ -147,6 +150,7 @@ function App() {
     setCameraOpen(false)
     setActionMessage('')
     setErrorMessage('')
+    setHomeErrorLocation(null)
     setPollMessage('')
     setIsLoadingRoom(false)
     if (updateUrl) window.history.pushState({}, '', '/')
@@ -173,6 +177,7 @@ function App() {
       })
       .catch((error) => {
         if (!active) return
+        setHomeErrorLocation('join')
         setErrorMessage(error instanceof Error ? error.message : 'Room tidak dapat dibuka.')
         setRoomCode('')
         setBooth(null)
@@ -282,11 +287,13 @@ function App() {
     if (isSubmitting) return
     setIsSubmitting(true)
     setErrorMessage('')
+    setHomeErrorLocation(null)
     setActionMessage('')
     try {
       const summary = await createBooth()
       setActiveBooth(summary, 'a')
     } catch (error) {
+      setHomeErrorLocation('hero')
       setErrorMessage(error instanceof Error ? error.message : 'Room gagal dibuat. Coba lagi.')
     } finally {
       setIsSubmitting(false)
@@ -297,17 +304,20 @@ function App() {
     event.preventDefault()
     const code = roomInput.trim().toUpperCase()
     if (!code) {
+      setHomeErrorLocation('join')
       setErrorMessage('Masukkan kode room terlebih dahulu.')
       return
     }
 
     setIsSubmitting(true)
     setErrorMessage('')
+    setHomeErrorLocation(null)
     setActionMessage('')
     try {
       const summary = await getBooth(code)
       setActiveBooth(summary, 'b')
     } catch (error) {
+      setHomeErrorLocation('join')
       setErrorMessage(error instanceof Error ? error.message : 'Room tidak ditemukan.')
     } finally {
       setIsSubmitting(false)
@@ -656,7 +666,7 @@ function App() {
             </button>
             <a className="pill-button pill-button-ghost" href="#gabung">masuk pakai kode <span>→</span></a>
           </div>
-          {errorMessage && <p className="hero-error form-error" role="alert">{errorMessage}</p>}
+          {errorMessage && homeErrorLocation === 'hero' && <p className="hero-error form-error" role="alert">{errorMessage}</p>}
         </div>
         <p className="scroll-note">geser untuk mulai / 01</p>
       </section>
@@ -698,7 +708,7 @@ function App() {
               </button>
             </div>
             <p id="join-hint" className="form-hint">Kamu akan masuk sebagai Orang B.</p>
-            {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}
+            {errorMessage && homeErrorLocation === 'join' && <p className="form-error" role="alert">{errorMessage}</p>}
           </form>
         </div>
         <p className="join-aside">Tanpa akun.<br />Tanpa ribet.<br />Cuma kalian berdua.</p>
