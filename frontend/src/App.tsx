@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent, SyntheticEvent } from 'react'
 import {
   createBooth,
+  deleteBooth,
+  finalizeBooth,
   getBooth,
   getPhotostripDownloadUrl,
   getPhotostripUrl,
+  getReferencePhotoUrl,
   uploadPhotos,
 } from './services/api'
-import type { BoothResponse, Participant } from './services/api'
+import type { BoothMode, BoothResponse, FrameStyle, Participant } from './services/api'
 import './App.css'
 
 const PHOTO_TOTAL = 4
@@ -28,6 +31,10 @@ function boothCodeFromPath() {
 
 function roleKey(code: string) {
   return `ldr-photobooth:${code}:participant`
+}
+
+function ownerTokenKey(code: string) {
+  return `ldr-photobooth:${code}:owner-token`
 }
 
 function cameraErrorMessage(error: unknown) {
@@ -80,6 +87,8 @@ function App() {
   const [errorMessage, setErrorMessage] = useState('')
   const [homeErrorLocation, setHomeErrorLocation] = useState<HomeErrorLocation>(null)
   const [copiedValue, setCopiedValue] = useState<'code' | 'link' | null>(null)
+  const [selectedMode, setSelectedMode] = useState<BoothMode>('REFERENCE')
+  const [selectedFrame, setSelectedFrame] = useState<FrameStyle>('CLASSIC')
 
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraState, setCameraState] = useState<CameraState>('idle')
@@ -100,6 +109,23 @@ function App() {
       window.localStorage.setItem(roleKey(code), role)
     } catch {
       // The flow still works when storage is blocked by the browser.
+    }
+  }
+
+  const rememberOwnerToken = (code: string, ownerToken?: string) => {
+    if (!ownerToken) return
+    try {
+      window.localStorage.setItem(ownerTokenKey(code), ownerToken)
+    } catch {
+      // Creating and sharing the room still works when storage is blocked.
+    }
+  }
+
+  const storedOwnerToken = (code: string) => {
+    try {
+      return window.localStorage.getItem(ownerTokenKey(code)) ?? ''
+    } catch {
+      return ''
     }
   }
 
@@ -154,6 +180,29 @@ function App() {
     setPollMessage('')
     setIsLoadingRoom(false)
     if (updateUrl) window.history.pushState({}, '', '/')
+  }
+
+  const handleDeleteRoom = async () => {
+    const ownerToken = storedOwnerToken(roomCode)
+    if (!roomCode || participant !== 'a' || !ownerToken) return
+    if (!window.confirm('Hapus room ini beserta semua foto dan photostrip? Tindakan ini tidak bisa dibatalkan.')) return
+
+    setIsSubmitting(true)
+    setErrorMessage('')
+    try {
+      await deleteBooth(roomCode, ownerToken)
+      try {
+        window.localStorage.removeItem(roleKey(roomCode))
+        window.localStorage.removeItem(ownerTokenKey(roomCode))
+      } catch {
+        // The room has already been deleted from the server.
+      }
+      resetToHome()
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Room gagal dihapus. Coba lagi.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   useEffect(() => {
@@ -290,7 +339,8 @@ function App() {
     setHomeErrorLocation(null)
     setActionMessage('')
     try {
-      const summary = await createBooth()
+      const summary = await createBooth(selectedMode)
+      rememberOwnerToken(summary.code, summary.ownerToken)
       setActiveBooth(summary, 'a')
     } catch (error) {
       setHomeErrorLocation('hero')
@@ -352,8 +402,10 @@ function App() {
 
     if (participant === 'a' && booth?.status === 'WAITING_B') {
       setActionMessage('Empat foto kamu sudah terkirim. Sekarang tinggal menunggu Orang B.')
+    } else if (booth?.status === 'READY_TO_FINALIZE') {
+      setActionMessage('Foto kalian sudah lengkap. Pembuat room tinggal memilih frame.')
     } else if (booth?.status === 'COMPLETED') {
-      setActionMessage('Foto kalian sudah lengkap. Photostrip siap diunduh!')
+      setActionMessage('Photostrip kalian sudah siap diunduh!')
     }
   }, [booth?.status, cameraOpen, canUseCamera, participant])
 
@@ -454,7 +506,7 @@ function App() {
       setBooth(summary)
       setActionMessage(participant === 'a'
         ? 'Empat foto kamu sudah terkirim. Sekarang tinggal menunggu Orang B.'
-        : 'Foto kalian sudah lengkap. Photostrip siap diunduh!')
+        : 'Foto kalian sudah lengkap. Pembuat room tinggal memilih frame.')
       stopCamera()
       clearCapturedPhotos()
       setCameraOpen(false)
@@ -469,6 +521,21 @@ function App() {
   const handleImageError = (event: SyntheticEvent<HTMLImageElement>) => {
     event.currentTarget.hidden = true
     setErrorMessage('Photostrip belum dapat dimuat. Coba muat ulang halaman beberapa saat lagi.')
+  }
+
+  const handleFinalize = async () => {
+    const token = storedOwnerToken(roomCode)
+    if (!token) return
+    setIsSubmitting(true)
+    setErrorMessage('')
+    try {
+      setBooth(await finalizeBooth(roomCode, token, selectedFrame))
+      setActionMessage('Frame dipasang. Photostrip kalian sudah siap!')
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Photostrip gagal dibuat. Coba lagi.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (isLoadingRoom) {
@@ -488,7 +555,7 @@ function App() {
         <main className="camera-screen">
           <header className="site-header camera-header">
             <button className="wordmark link-button" type="button" onClick={() => resetToHome()}>ldr / photobooth</button>
-            <span className="header-note">room {roomCode} · kamu Orang {participant.toUpperCase()}</span>
+            <span className="header-note">room {roomCode} · {participant === 'a' ? 'pembuat' : 'tamu'}</span>
             <button className="text-button" type="button" onClick={leaveCamera}>keluar</button>
           </header>
 
@@ -500,6 +567,9 @@ function App() {
             </div>
 
             <div className={`camera-frame camera-frame-${cameraState}`}>
+              {participant === 'b' && booth.mode === 'REFERENCE' && (
+                <img className="reference-photo" src={getReferencePhotoUrl(roomCode, Math.min(capturedPhotos.length + 1, 4))} alt="Referensi pose pasangan" />
+              )}
               <video ref={videoRef} autoPlay playsInline muted aria-label="Pratinjau kamera" />
               {cameraState === 'requesting' && <div className="camera-overlay"><span className="status-spinner" /><p>Menyiapkan kamera...</p></div>}
               {cameraState === 'error' && (
@@ -568,18 +638,51 @@ function App() {
             <div className="result-copy">
               <p className="eyebrow">kalian berhasil</p>
               <h1>Satu jarak,<br /><em>satu cerita.</em></h1>
-              <p>Empat momen dari dua tempat sudah jadi satu photostrip.</p>
+              <p>Empat momen dari dua tempat sudah jadi satu photostrip. Room dan seluruh fotonya otomatis terhapus 15 menit setelah hasil dibuat.</p>
               {actionMessage && <p className="success-message" role="status">{actionMessage}</p>}
               {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}
               <div className="result-actions">
                 <a className="pill-button pill-button-dark" href={downloadUrl}>unduh photostrip <span>↓</span></a>
                 <button className="pill-button outline-button" type="button" onClick={() => void copyRoomValue('link')}>{copiedValue === 'link' ? 'link tersalin' : 'salin link room'} <span>+</span></button>
+                {participant === 'a' && storedOwnerToken(roomCode) && (
+                  <button className="pill-button delete-room-button" type="button" disabled={isSubmitting} onClick={() => void handleDeleteRoom()}>
+                    {isSubmitting ? 'menghapus…' : 'hapus room'}
+                  </button>
+                )}
               </div>
               <button className="inline-button result-home-link" type="button" onClick={() => resetToHome()}>buat room baru</button>
             </div>
             <div className="photostrip-wrap">
               <img className="photostrip" src={resultUrl} alt={`Photostrip room ${roomCode}`} onError={handleImageError} />
             </div>
+          </section>
+        </main>
+      )
+    }
+
+    if (booth.status === 'READY_TO_FINALIZE') {
+      const isOwner = participant === 'a' && Boolean(storedOwnerToken(roomCode))
+      return (
+        <main className="waiting-screen">
+          <header className="site-header waiting-header">
+            <button className="wordmark link-button" type="button" onClick={() => resetToHome()}>ldr / photobooth</button>
+            <span className="header-note">room {roomCode}</span><span className="room-number">reveal</span>
+          </header>
+          <section className="waiting-content finalize-content">
+            <p className="eyebrow">foto kalian sudah lengkap</p>
+            <h1>Saatnya pilih<br /><em>suasananya.</em></h1>
+            {isOwner ? <>
+              <p className="waiting-copy">Pilih satu dari tiga frame. Pilihanmu akan dipakai untuk hasil akhir kalian.</p>
+              <div className="frame-options">
+                {(['CLASSIC', 'POLAROID', 'MIDNIGHT'] as FrameStyle[]).map((frame) => (
+                  <button key={frame} type="button" className={`frame-option frame-${frame.toLowerCase()} ${selectedFrame === frame ? 'selected' : ''}`} onClick={() => setSelectedFrame(frame)}>
+                    <span /><strong>{frame === 'CLASSIC' ? 'Classic' : frame === 'POLAROID' ? 'Polaroid' : 'Midnight'}</strong>
+                  </button>
+                ))}
+              </div>
+              <button className="pill-button start-button" type="button" disabled={isSubmitting} onClick={() => void handleFinalize()}>{isSubmitting ? 'membuat hasil...' : 'finalisasi photostrip'} <span>→</span></button>
+            </> : <p className="waiting-copy">Pembuat room sedang memilih frame. Hasilnya akan muncul otomatis di halaman ini.</p>}
+            {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}
           </section>
         </main>
       )
@@ -597,18 +700,18 @@ function App() {
         : <>Tunggu sebentar,<br /><em>ya.</em></>
 
     const description = isCreatorReady
-      ? 'Kamu adalah Orang A. Ambil 4 foto, lalu bagikan link ini ke pasanganmu.'
+      ? 'Kamu membuat room ini. Ambil 4 foto, lalu kirim link undangannya ke pasanganmu.'
       : isJoinerWaiting
-        ? 'Kamu adalah Orang B. Orang A sedang menyiapkan 4 fotonya. Halaman ini akan berubah otomatis.'
+        ? 'Kamu bergabung lewat undangan. Pembuat room sedang mengambil 4 foto. Halaman ini akan berubah otomatis.'
         : isCreatorWaiting
-          ? 'Empat foto kamu sudah terkirim. Bagikan link room, lalu tunggu Orang B menyelesaikan bagiannya.'
-          : 'Foto Orang A sudah masuk. Ambil 4 fotomu untuk menyelesaikan photostrip kalian.'
+          ? 'Empat foto kamu sudah terkirim. Bagikan link room, lalu tunggu pasanganmu menyelesaikan bagiannya.'
+          : 'Empat foto dari pembuat room sudah masuk. Sekarang ambil 4 fotomu untuk menyelesaikan photostrip kalian.'
 
     return (
       <main className="waiting-screen">
         <header className="site-header waiting-header">
           <button className="wordmark link-button" type="button" onClick={() => resetToHome()}>ldr / photobooth</button>
-          <span className="header-note">room privat · kamu Orang {participant.toUpperCase()}</span>
+          <span className="header-note">room privat · {participant === 'a' ? 'sebagai pembuat' : 'sebagai tamu'}</span>
           <span className="room-number">{roomCode}</span>
         </header>
 
@@ -625,6 +728,11 @@ function App() {
             <button className="pill-button outline-button" type="button" onClick={() => void copyRoomValue('link')}>
               {copiedValue === 'link' ? 'link tersalin' : 'salin link undangan'} <span>↗</span>
             </button>
+            {participant === 'a' && storedOwnerToken(roomCode) && (
+              <button className="pill-button delete-room-button" type="button" disabled={isSubmitting} onClick={() => void handleDeleteRoom()}>
+                {isSubmitting ? 'menghapus…' : 'hapus room'}
+              </button>
+            )}
           </div>
 
           {(isCreatorReady || isJoinerReady) && (
@@ -666,6 +774,10 @@ function App() {
             </button>
             <a className="pill-button pill-button-ghost" href="#gabung">masuk pakai kode <span>→</span></a>
           </div>
+          <div className="mode-picker" aria-label="Pilih mode room">
+            <button type="button" className={selectedMode === 'REFERENCE' ? 'selected' : ''} onClick={() => setSelectedMode('REFERENCE')}><strong>Reference Mode</strong><span>Tamu melihat foto pembuat agar pose bisa nyambung.</span></button>
+            <button type="button" className={selectedMode === 'SURPRISE' ? 'selected' : ''} onClick={() => setSelectedMode('SURPRISE')}><strong>Surprise Mode</strong><span>Foto baru terlihat bersama saat reveal.</span></button>
+          </div>
           {errorMessage && homeErrorLocation === 'hero' && <p className="hero-error form-error" role="alert">{errorMessage}</p>}
         </div>
         <p className="scroll-note">geser untuk mulai / 01</p>
@@ -678,10 +790,10 @@ function App() {
           <p>Nggak perlu akun dan nggak perlu foto bersamaan. Cukup kamera, link room, dan satu orang yang kamu tunggu.</p>
         </div>
         <div className="steps" aria-label="Langkah menggunakan photobooth">
-          <div className="step"><span>01</span><strong>Buat room</strong><p>Orang A membuat room privat dan mendapat kode.</p></div>
-          <div className="step"><span>02</span><strong>Ambil 4 foto</strong><p>Orang A berfoto dulu, lalu mengirim link ke Orang B.</p></div>
-          <div className="step"><span>03</span><strong>Lanjut bergantian</strong><p>Orang B membuka link dan mengambil 4 foto juga.</p></div>
-          <div className="step"><span>04</span><strong>Unduh hasilnya</strong><p>Dua sisi digabung menjadi satu photostrip.</p></div>
+          <div className="step"><span>01</span><strong>Buat room</strong><p>Pembuat memilih mode dan mendapat kode privat.</p></div>
+          <div className="step"><span>02</span><strong>Ambil 4 foto</strong><p>Pembuat berfoto dulu, lalu mengirim link undangan.</p></div>
+          <div className="step"><span>03</span><strong>Lanjut bergantian</strong><p>Tamu membuka link dan mengambil 4 foto juga.</p></div>
+          <div className="step"><span>04</span><strong>Pilih frame</strong><p>Reveal, pilih frame, lalu unduh photostrip.</p></div>
         </div>
       </section>
 
@@ -707,7 +819,7 @@ function App() {
                 {isSubmitting ? 'mengecek...' : 'masuk room'} <span>→</span>
               </button>
             </div>
-            <p id="join-hint" className="form-hint">Kamu akan masuk sebagai Orang B.</p>
+            <p id="join-hint" className="form-hint">Kamu akan masuk sebagai tamu di room ini.</p>
             {errorMessage && homeErrorLocation === 'join' && <p className="form-error" role="alert">{errorMessage}</p>}
           </form>
         </div>

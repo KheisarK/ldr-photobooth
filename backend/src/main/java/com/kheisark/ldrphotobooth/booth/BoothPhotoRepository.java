@@ -9,4 +9,6 @@ public interface BoothPhotoRepository extends JpaRepository<BoothPhoto, Long> {
     List<BoothPhoto> findAllByBoothAndParticipantOrderByPhotoIndexAsc(Booth booth, Participant participant);
 
     long countByBoothAndParticipant(Booth booth, Participant participant);
+
+    void deleteAllByBooth(Booth booth);
 }

@@ -1,10 +1,10 @@
 # LDR Photobooth
 
-Photobooth dua orang untuk pasangan atau teman yang sedang berada di tempat berbeda. Orang A membuat ruang dan mengambil empat foto, lalu membagikan tautan atau kode kepada Orang B. Setelah Orang B mengambil empat foto, aplikasi menyusun keduanya menjadi satu photostrip yang dapat diunduh.
+Photobooth dua orang untuk pasangan atau teman yang sedang berada di tempat berbeda. Pembuat room berfoto lebih dulu, lalu tamu merespons dari tempat lain. Delapan foto mereka disusun menjadi satu photostrip yang dapat dipilih frame-nya dan diunduh.
 
 ## Demo
 
-- Frontend: https://trustworthy-reprieve-production-b657.up.railway.app
+- Frontend: https://ldr-photobooth.up.railway.app
 - Backend API: https://ldr-photobooth-production-b840.up.railway.app/api
 
 ## Teknologi
@@ -47,12 +47,12 @@ Backend lokal berjalan di `http://localhost:8000` dan menggunakan database H2 se
 
 ## Alur MVP
 
-1. Orang A membuat ruang.
-2. Orang A membagikan tautan atau kode ruang kepada Orang B.
-3. Orang A mengambil dan mengirim empat foto.
-4. Orang B membuka ruang, lalu mengambil dan mengirim empat foto.
-5. Backend menyusun delapan foto menjadi satu photostrip.
-6. Kedua orang dapat mengunduh hasilnya.
+1. Pembuat memilih `Reference Mode` atau `Surprise Mode`, lalu membuat room.
+2. Pembuat mengambil empat foto dan membagikan link atau kode.
+3. Tamu mengambil empat foto; dalam Reference Mode, foto pembuat tampil sebagai panduan pose.
+4. Setelah reveal, pembuat memilih salah satu dari tiga frame: Classic, Polaroid, atau Midnight.
+5. Keduanya dapat mengunduh photostrip. Pembuat juga dapat menghapus room secara manual.
+6. Demi privasi, room selesai otomatis terhapus setelah 15 menit; room yang tidak selesai dibersihkan setelah 24 jam.
 
 ## Cara kerja tim
 
@@ -69,4 +69,4 @@ Lihat [docs/API.md](docs/API.md) untuk endpoint, status ruang, format upload fot
 
 ## Batasan MVP
 
-Belum ada akun, chat, filter AI, pembayaran, atau dashboard admin. Fokus MVP adalah menyelesaikan satu alur dua orang dari pembuatan ruang sampai photostrip dapat diunduh.
+Belum ada akun, chat, filter AI, editor bebas, pembayaran, atau dashboard admin. Fokus MVP adalah satu pengalaman dua orang yang ringkas, privat, dan terasa dilakukan bersama.
