@@ -8,13 +8,13 @@ public enum Participant {
 
     public static Participant from(String value) {
         if (value == null) {
-            throw new IllegalArgumentException("Participant is required.");
+            throw new IllegalArgumentException("Peserta wajib diisi.");
         }
 
         try {
             return valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("Participant must be 'a' or 'b'.");
+            throw new IllegalArgumentException("Peserta harus diisi dengan 'a' atau 'b'.");
         }
     }
 }
