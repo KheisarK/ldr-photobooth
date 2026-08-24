@@ -111,11 +111,12 @@ function App() {
           <section className="camera-content">
             <div className="camera-heading"><p className="eyebrow">room {roomCode}</p><h1>Look at<br /><em>each other.</em></h1></div>
             <div className="camera-frame">
-              {photos.length > 0 ? <div className="photo-grid">{photos.map((photo, index) => <img key={`${photo}-${index}`} src={photo} alt={`Captured photo ${index + 1}`} />)}{photos.length < 4 && <video ref={videoRef} autoPlay playsInline muted />}</div> : <video ref={videoRef} autoPlay playsInline muted />}
+              <video ref={videoRef} autoPlay playsInline muted />
               {countdown !== null && <div className="countdown">{countdown}</div>}
             </div>
             <div className="camera-controls">
               <div className="participant-toggle"><span>your side</span><button className={participant === 'a' ? 'active' : ''} type="button" onClick={() => setParticipant('a')}>A</button><button className={participant === 'b' ? 'active' : ''} type="button" onClick={() => setParticipant('b')}>B</button></div>
+              {photos.length > 0 && <div className="photo-thumbnails">{photos.map((photo, index) => <img key={`${photo}-${index}`} src={photo} alt={`Captured photo ${index + 1}`} />)}</div>}
               <p>{photos.length}/4 photos captured. {photos.length < 4 ? 'Capture four moments for your strip.' : 'Ready to send your photos.'}</p>
               {photos.length < 4 ? <button className="pill-button pill-button-light" type="button" onClick={capturePhoto} disabled={countdown !== null}>{countdown !== null ? 'get ready...' : 'capture photo'} <span>+</span></button> : <button className="pill-button pill-button-light" type="button" onClick={uploadCapturedPhotos} disabled={isUploading}>{isUploading ? 'uploading...' : `upload 4 photos`} <span>-&gt;</span></button>}
               {errorMessage && <p className="form-error" role="alert">{errorMessage}</p>}

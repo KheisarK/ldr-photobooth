@@ -63,9 +63,8 @@ footer { display: flex; font-size: 11px; justify-content: space-between; letter-
 .camera-heading h1 em { font-weight: 300; }
 .camera-frame { aspect-ratio: 4 / 3; background: #000; overflow: hidden; position: relative; }
 .camera-frame video, .camera-frame img { display: block; height: 100%; object-fit: cover; width: 100%; }
-.photo-grid { display: grid; gap: 2px; grid-template-columns: repeat(2, 1fr); height: 100%; }
-.photo-grid img { min-height: 0; }
-.photo-grid video { grid-column: 1 / -1; min-height: 0; }
+.photo-thumbnails { display: grid; gap: 6px; grid-template-columns: repeat(4, 1fr); margin-bottom: 22px; max-width: 650px; }
+.photo-thumbnails img { aspect-ratio: 4 / 3; display: block; object-fit: cover; width: 100%; }
 .countdown { align-items: center; background: rgba(0,0,0,.3); display: flex; font-size: 100px; inset: 0; justify-content: center; position: absolute; }
 .camera-controls { align-self: end; grid-column: 2; }
 .camera-controls p { color: #9a9a9a; font-size: 14px; margin-bottom: 22px; }
