@@ -1,0 +1,47 @@
+# === Dependencies ===
+node_modules/
+.pnp/
+.pnp.js
+
+# === Build Output ===
+dist/
+build/
+out/
+target/
+*.jar
+*.war
+*.class
+
+# === Environment Variables ===
+.env
+.env.local
+.env.*.local
+
+# === IDE ===
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+
+# === OS ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Logs ===
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === Testing ===
+coverage/
+*.lcov
+
+# === Misc ===
+*.bak
+*.tmp
+*.temp
