@@ -791,7 +791,7 @@ function App() {
     <main className="home-page">
       <header className="site-header home-header">
         <button className="wordmark link-button" type="button" onClick={resetHomeAndScroll}>ldr / photobooth</button>
-        <span className="header-note">dua tempat · satu cerita</span>
+        <span className="header-note">bareng, walau berjauhan</span>
         <nav aria-label="Navigasi utama">
           <a href="#cara-main">cara main</a>
           <button type="button" onClick={openJoinDialog}>gabung room</button>
@@ -805,7 +805,7 @@ function App() {
           <div className="home-hero-copy">
             <p className="eyebrow">photobooth berdua dari tempat berbeda</p>
             <h1 id="hero-title">Dua tempat.<br /><em>Satu photostrip.</em></h1>
-            <p className="hero-copy">Ambil foto bergantian, saling balas pose, lalu satukan delapan momen kalian dalam satu strip yang bisa disimpan.</p>
+            <p className="hero-copy">Buat room, ambil 4 foto bergantian, lalu gabungkan jadi satu photostrip—bareng pasangan, sahabat, atau siapa pun yang lagi jauh.</p>
 
             <fieldset className="home-mode-picker">
               <legend>Pilih suasana sesi</legend>
@@ -820,8 +820,8 @@ function App() {
                 </label>
               </div>
               <p aria-live="polite">{selectedMode === 'REFERENCE'
-                ? 'Pasangan melihat fotomu sebagai referensi agar pose kalian terasa saling merespons.'
-                : 'Foto pasangan disembunyikan selama sesi dan baru terlihat bersama saat reveal.'}</p>
+                ? 'Tamu melihat foto pembuat sebagai referensi agar pose keduanya bisa saling merespons.'
+                : 'Foto pembuat disembunyikan dari tamu dan baru terlihat bersama saat reveal.'}</p>
             </fieldset>
 
             <div className="home-hero-actions">
@@ -836,8 +836,8 @@ function App() {
           </div>
 
           <figure className={`product-preview ${selectedMode === 'SURPRISE' ? 'is-surprise' : ''}`} role="img" aria-label={`Contoh photostrip dalam ${selectedMode === 'REFERENCE' ? 'Reference' : 'Surprise'} Mode`}>
-            <div className="preview-note preview-note-a">A · kiri</div>
-            <div className="preview-note preview-note-b">B · kanan</div>
+            <div className="preview-note preview-note-a">A / pembuat</div>
+            <div className="preview-note preview-note-b">B / tamu</div>
             <div className="sample-tape" aria-hidden="true" />
             <div className="sample-strip">
               <div className="sample-strip-head"><span>ldr / booth</span><span>08·25·26</span></div>
@@ -847,9 +847,9 @@ function App() {
                   <div className={`sample-photo sample-person-b sample-palette-${index}`}><span className="portrait-head" /><span className="portrait-body" /><span className="surprise-cover"><b>?</b><small>lihat saat reveal</small></span></div>
                 </div>
               ))}
-              <div className="sample-caption">jauh di peta, dekat di frame ♡</div>
+              <div className="sample-caption">4 foto + 4 foto → 1 strip</div>
             </div>
-            <div className="preview-badge"><strong>4 + 4</strong><span>foto jadi satu</span></div>
+            <div className="preview-badge"><strong>{selectedMode === 'REFERENCE' ? 'reference' : 'surprise'}</strong><span>mode</span></div>
           </figure>
         </div>
       </section>
@@ -861,23 +861,23 @@ function App() {
       <section className="how-section" id="cara-main" aria-labelledby="how-title">
         <div className="how-heading">
           <p className="section-label">cara main / tiga langkah</p>
-          <h2 id="how-title">Nggak harus satu tempat<br /><em>untuk punya satu momen.</em></h2>
+          <h2 id="how-title">Bikin kenangan<br /><em>tanpa harus ketemu.</em></h2>
         </div>
         <ol className="how-steps">
-          <li><span>01</span><div><strong>Buat & bagikan</strong><p>Pilih mode, buat room privat, lalu kirim link ke pasanganmu.</p></div></li>
+          <li><span>01</span><div><strong>Buat & bagikan</strong><p>Pilih mode, buat room privat, lalu kirim link ke teman fotomu.</p></div></li>
           <li><span>02</span><div><strong>Foto bergantian</strong><p>Kalian mengambil empat foto masing-masing, dari kamera dan tempat sendiri.</p></div></li>
           <li><span>03</span><div><strong>Reveal & simpan</strong><p>Pilih frame setelah reveal, lalu unduh photostrip sebelum room terhapus otomatis.</p></div></li>
         </ol>
         <div className="mode-explainer">
-          <article><span aria-hidden="true">◎</span><div><strong>Reference Mode</strong><p>Lihat pose pasangan saat giliranmu supaya gestur dan ceritanya bisa nyambung.</p></div></article>
-          <article><span aria-hidden="true">◐</span><div><strong>Surprise Mode</strong><p>Berfoto tanpa mengintip, lalu lihat semua respons kalian saat reveal.</p></div></article>
+          <article><span aria-hidden="true">R</span><div><strong>Reference Mode</strong><p>Tamu melihat foto pembuat supaya gestur dan ceritanya bisa saling merespons.</p></div></article>
+          <article><span aria-hidden="true">S</span><div><strong>Surprise Mode</strong><p>Tamu berfoto tanpa mengintip, lalu keduanya melihat hasil lengkap saat reveal.</p></div></article>
         </div>
       </section>
 
       <section className="home-closing" aria-label="Tentang privasi room">
-        <p className="eyebrow">kecil, privat, cuma untuk kalian</p>
-        <p>Room selesai tersimpan selama 15 menit—cukup untuk download, lalu semua foto dibersihkan otomatis.</p>
-        <span aria-hidden="true">♡</span>
+        <p className="eyebrow">room privat untuk dua orang</p>
+        <p>Hasil tersimpan selama 15 menit untuk diunduh. Setelah itu, room dan seluruh foto dihapus otomatis.</p>
+        <span aria-hidden="true">15′</span>
       </section>
 
       <dialog
@@ -889,7 +889,7 @@ function App() {
       >
         <button className="dialog-close" type="button" onClick={closeJoinDialog} aria-label="Tutup form gabung">×</button>
         <p className="eyebrow">sudah dapat undangan?</p>
-        <h2 id="join-title">Masuk ke<br /><em>room kalian.</em></h2>
+        <h2 id="join-title">Masuk ke<br /><em>room ini.</em></h2>
         <form className="join-form" onSubmit={joinRoom} aria-busy={isSubmitting}>
           <label htmlFor="room-code">kode room</label>
           <div className="dialog-form-row">
